@@ -6,6 +6,24 @@ An LLM-based assistant designed to help **authorized** security teams plan, docu
 
 ---
 
+## Project status
+
+This repository is currently **scaffolding** for an LLM project. The structure, prompts, and guardrails are being established first; implementation details (model provider wiring, UI, workflows) will evolve over time.
+
+What you can do now:
+
+- Review and refine the **policy/guardrails** and intended use
+- Add/issues for the first planned workflows (scope intake, triage, report writing)
+- Contribute templates (ROE, reporting, note-taking) and docs
+
+What you should not expect yet:
+
+- A stable API/CLI/UI
+- Provider integrations that “just work” out of the box
+- Production-ready behavior
+
+---
+
 ## What this project is
 
 `superPENTESTING` is an AI assistant concept/project for supporting **defensive security** and **legitimate pentesting engagements**, such as:
