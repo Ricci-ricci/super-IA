@@ -1,0 +1,71 @@
+# ----------------------------
+# Python bytecode / caches
+# ----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# pytest
+.pytest_cache/
+
+# mypy / type checkers
+.mypy_cache/
+.pyright/
+.pytype/
+
+# Ruff
+.ruff_cache/
+
+# ----------------------------
+# Virtual environments
+# ----------------------------
+.venv/
+venv/
+ENV/
+env/
+
+# ----------------------------
+# Build / packaging
+# ----------------------------
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+wheels/
+
+# ----------------------------
+# Logs / local data
+# ----------------------------
+*.log
+logs/
+data/
+artifacts/
+runs/
+cache/
+.caches/
+*.sqlite
+*.db
+
+# ----------------------------
+# Secrets (never commit)
+# ----------------------------
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+secrets/
+secrets/**
+
+# ----------------------------
+# OS / editor files
+# ----------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
