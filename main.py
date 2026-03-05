@@ -7,56 +7,36 @@ from typing import Any, Dict, Optional
 from knowledge_base import INTENTS, SERVICES_ACTIONS
 from parser import get_nmap_imput, parse_nmap
 
-# Try to import requests, fall back gracefully if not available
+# Try to import the LLM client, fall back gracefully if not available
 try:
-    import requests
+    from llm import PENTEST_SYSTEM_PROMPT, OllamaClient
 
-    HAS_REQUESTS = True
+    HAS_LLM = True
 except ImportError:
-    HAS_REQUESTS = False
+    HAS_LLM = False
 
+    # Fallback stub client
+    class OllamaClient:
+        def __init__(
+            self, base_url: str = "http://localhost:11434", model: str = "llama3.2:3b"
+        ):
+            self.base_url = base_url
+            self.model = model
+            self.available = False
 
-class OllamaClient:
-    """Simple Ollama HTTP client for local LLM integration."""
-
-    def __init__(
-        self, base_url: str = "http://localhost:11434", model: str = "llama3.2:3b"
-    ):
-        self.base_url = base_url.rstrip("/")
-        self.model = model
-        self.available = HAS_REQUESTS
-
-    def generate(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """Send a prompt to Ollama and return the response."""
-        if not self.available:
+        def chat(
+            self,
+            model: str,
+            message: str,
+            system_prompt: str = None,
+            temperature: float = 0.3,
+        ) -> str:
             return None
 
-        try:
-            response = requests.post(
-                f"{self.base_url}/api/generate",
-                json={
-                    "model": self.model,
-                    "system": system_prompt,
-                    "prompt": user_prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.3,
-                        "top_p": 0.9,
-                    },
-                },
-                timeout=30,
-            )
+        def is_available(self) -> bool:
+            return False
 
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("response", "").strip()
-            else:
-                print(f"[DEBUG] Ollama error: {response.status_code}")
-                return None
-
-        except Exception as e:
-            print(f"[DEBUG] Ollama connection failed: {e}")
-            return None
+    PENTEST_SYSTEM_PROMPT = ""
 
 
 def detect_intent(user_text: str) -> str:
@@ -127,28 +107,28 @@ def build_pentesting_context(parsed_services: list) -> str:
 def get_llm_scan_analysis(
     parsed_services: list, llm_client: OllamaClient
 ) -> Optional[str]:
-    """Get AI analysis of scan results using local LLM."""
-    system_prompt = """You are a pentesting assistant for AUTHORIZED security assessments only.
+    """Get AI analysis of scan results using local LLM with quick timeout."""
+    if not llm_client.is_available():
+        return None
 
-Your role:
-- Analyze scan results and provide actionable testing guidance
-- Prioritize findings by potential security impact
-- Suggest safe, non-destructive validation steps
-- Focus on evidence collection and documentation
-- Always emphasize authorized testing within scope
+    # Very simplified prompt for CPU inference
+    services_text = []
+    for port, service, version in parsed_services:
+        services_text.append(f"{service}")
 
-Format your response with:
-1. Priority assessment (High/Medium/Low risk services)
-2. Specific testing recommendations per service
-3. Evidence collection guidance
-4. Next steps within scope
+    simple_prompt = f"Security analysis for: {', '.join(services_text)}. Priority?"
 
-Keep responses concise but detailed enough for action."""
-
-    context = build_pentesting_context(parsed_services)
-    user_prompt = f"{context}\n\nPlease analyze these services and provide testing recommendations."
-
-    return llm_client.generate(system_prompt, user_prompt)
+    try:
+        # Set a shorter timeout for CPU inference
+        llm_client.timeout = 20
+        return llm_client.chat(
+            model=llm_client.model,
+            message=simple_prompt,
+            system_prompt=None,  # No system prompt for speed
+            temperature=0.0,
+        )
+    except Exception:
+        return None
 
 
 def show_scan_results(nmap_text: str, llm_client: OllamaClient) -> None:
@@ -162,8 +142,13 @@ def show_scan_results(nmap_text: str, llm_client: OllamaClient) -> None:
         )
         return
 
-    # Try to get AI analysis first
-    llm_analysis = get_llm_scan_analysis(parsed, llm_client)
+    # Try to get AI analysis first (quick attempt only)
+    llm_analysis = None
+    if parsed and len(parsed) <= 2 and HAS_LLM:  # Only try AI for very small scans
+        print("Getting AI analysis (20s timeout)...")
+        llm_analysis = get_llm_scan_analysis(parsed, llm_client)
+        if not llm_analysis:
+            print("AI analysis timed out - showing traditional analysis.")
 
     if llm_analysis:
         print("=== AI ANALYSIS ===")
@@ -181,12 +166,12 @@ def show_scan_results(nmap_text: str, llm_client: OllamaClient) -> None:
         )
         print(f"Recommended Actions: {actions}")
 
-    if not llm_analysis and HAS_REQUESTS:
+    if not llm_analysis and HAS_LLM and len(parsed) <= 2:
         print(
-            "\n[INFO] Local LLM not available. Install Ollama and pull a model (e.g., 'ollama pull llama3.2:3b') for AI analysis."
+            "\n[INFO] AI analysis skipped (CPU inference too slow). Traditional analysis shown above."
         )
-    elif not HAS_REQUESTS:
-        print("\n[INFO] Install 'requests' library for AI analysis features.")
+    elif not HAS_LLM:
+        print("\n[INFO] LLM module not available. Check llm.py file.")
 
 
 def main() -> None:
@@ -194,10 +179,10 @@ def main() -> None:
     llm_client = OllamaClient()
 
     print("superPENTESTING - tiny pentest helper (authorized use only).")
-    if llm_client.available:
+    if HAS_LLM and llm_client.is_available():
         print(f"AI analysis enabled (model: {llm_client.model})")
     else:
-        print("AI analysis disabled (install 'requests' and Ollama for AI features)")
+        print("AI analysis disabled (check Ollama installation)")
     print("Type 'help' for commands.\n")
 
     while True:

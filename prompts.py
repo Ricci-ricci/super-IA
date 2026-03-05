@@ -86,7 +86,10 @@ Create a structured finding with:
 
 Format for inclusion in a professional penetration test report."""
 
-def build_scan_context(services: list, scope: str = "Not specified", phase: str = "Discovery") -> str:
+
+def build_scan_context(
+    services: list, scope: str = "Not specified", phase: str = "Discovery"
+) -> str:
     """
     Build context for LLM scan analysis.
 
@@ -107,12 +110,13 @@ def build_scan_context(services: list, scope: str = "Not specified", phase: str 
         services_summary.append(f"  {risk_indicator} {port} - {service} ({version})")
 
     return SCAN_ANALYSIS_TEMPLATE.format(
-        services_summary="\n".join(services_summary),
-        scope=scope,
-        phase=phase
+        services_summary="\n".join(services_summary), scope=scope, phase=phase
     )
 
-def build_service_context(port: str, service: str, version: str, context: str = "") -> str:
+
+def build_service_context(
+    port: str, service: str, version: str, context: str = ""
+) -> str:
     """
     Build context for detailed service analysis.
 
@@ -129,8 +133,5 @@ def build_service_context(port: str, service: str, version: str, context: str = 
         service_name=service,
         port=port,
         version=version or "Version not detected",
-        context=context or "Standard service discovery"
+        context=context or "Standard service discovery",
     )
-```
-
-Now let me implement the Ollama client and integrate it with your existing code:

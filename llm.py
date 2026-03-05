@@ -2,47 +2,59 @@
 Local LLM client for Ollama integration.
 
 This module provides a simple HTTP client to interact with Ollama running locally.
-Ollama exposes an OpenAI-compatible API at localhost:11434 by default.
+Ollama exposes its native API at localhost:11434 by default.
 
 Usage:
-    from llm import OllamaClient
+    from llm import OllamaClient, PENTEST_SYSTEM_PROMPT
 
     client = OllamaClient()
-    response = client.chat("llama3.1:8b", "What are common SSH hardening steps?")
-    print(response)
+    if client.is_available():
+        response = client.chat("llama3.2:3b", "What are common SSH hardening steps?", PENTEST_SYSTEM_PROMPT)
+        print(response)
 """
 
 from __future__ import annotations
 
 import json
-import urllib.parse
-import urllib.request
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Optional
+
+# Try to import requests, fall back gracefully if not available
+try:
+    import requests
+
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
 
 
-@dataclass
-class LLMResponse:
-    """Response from the LLM with metadata."""
+# Pentesting-focused system prompt - simplified for faster inference
+PENTEST_SYSTEM_PROMPT = """You are a pentesting assistant for AUTHORIZED security testing only.
 
-    content: str
-    model: str
-    finish_reason: str
-    usage: Optional[Dict[str, Any]] = None
+Analyze services and provide:
+1. Risk level (High/Medium/Low)
+2. Testing recommendations
+3. Evidence to collect
+
+Keep responses concise and actionable."""
 
 
 class OllamaClient:
-    """Simple HTTP client for Ollama local LLM server."""
+    """Simple HTTP client for Ollama local LLM server using native API."""
 
-    def __init__(self, base_url: str = "http://localhost:11434"):
+    def __init__(
+        self, base_url: str = "http://localhost:11434", model: str = "llama3.2:3b"
+    ):
         """
         Initialize Ollama client.
 
         Args:
             base_url: Ollama server URL (default: http://localhost:11434)
+            model: Default model name to use
         """
         self.base_url = base_url.rstrip("/")
-        self.timeout = 60  # seconds
+        self.model = model
+        self.timeout = 120  # seconds - increased for CPU inference
+        self.available = HAS_REQUESTS
 
     def chat(
         self,
@@ -50,88 +62,82 @@ class OllamaClient:
         message: str,
         system_prompt: Optional[str] = None,
         temperature: float = 0.3,
-    ) -> str:
+    ) -> Optional[str]:
         """
-        Send a chat message to the local LLM.
+        Send a chat message to the local LLM using Ollama's native API.
 
         Args:
-            model: Model name (e.g., "llama3.1:8b", "qwen2.5:7b")
+            model: Model name (e.g., "llama3.2:3b")
             message: User message to send
             system_prompt: Optional system prompt to set context
             temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative)
 
         Returns:
-            The LLM's response as a string
-
-        Raises:
-            ConnectionError: If Ollama server is not reachable
-            ValueError: If the response is invalid
+            The LLM's response as a string, or None if failed
         """
-        # Build messages array (OpenAI format)
-        messages = []
+        if not self.available:
+            return None
 
+        # Prepare the prompt with system context if provided
         if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
+            full_prompt = f"System: {system_prompt}\n\nUser: {message}\n\nResponse:"
+        else:
+            full_prompt = message
 
-        messages.append({"role": "user", "content": message})
-
-        # Prepare request payload
+        # Prepare request payload for Ollama's native /api/generate endpoint
         payload = {
             "model": model,
-            "messages": messages,
-            "temperature": temperature,
+            "prompt": full_prompt,
             "stream": False,  # Get complete response, not streaming
+            "options": {
+                "temperature": temperature,
+                "top_p": 0.9,
+            },
         }
 
         try:
-            return self._send_request("/v1/chat/completions", payload)
+            return self._send_request("/api/generate", payload)
         except Exception as e:
-            # Fallback error message if LLM fails
-            return f"[LLM Error] Could not generate response: {str(e)}"
+            print(f"[DEBUG] LLM Error: {str(e)}")
+            return None
 
-    def _send_request(self, endpoint: str, payload: Dict[str, Any]) -> str:
+    def _send_request(self, endpoint: str, payload: dict) -> Optional[str]:
         """
         Send HTTP POST request to Ollama server.
 
         Args:
-            endpoint: API endpoint (e.g., "/v1/chat/completions")
+            endpoint: API endpoint (e.g., "/api/generate")
             payload: Request data as dictionary
 
         Returns:
-            Response content from the LLM
+            Response content from the LLM, or None if failed
         """
         url = f"{self.base_url}{endpoint}"
 
-        # Encode payload as JSON
-        data = json.dumps(payload).encode("utf-8")
-
-        # Create HTTP request
-        req = urllib.request.Request(
-            url,
-            data=data,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-        )
-
         try:
-            # Send request with timeout
-            with urllib.request.urlopen(req, timeout=self.timeout) as response:
-                response_data = response.read().decode("utf-8")
-
-            # Parse JSON response
-            result = json.loads(response_data)
-
-            # Extract content from OpenAI-compatible response
-            if "choices" in result and len(result["choices"]) > 0:
-                return result["choices"][0]["message"]["content"]
-            else:
-                raise ValueError(f"Unexpected response format: {result}")
-
-        except urllib.error.URLError as e:
-            raise ConnectionError(
-                f"Cannot connect to Ollama at {url}. Is Ollama running? Error: {e}"
+            response = requests.post(
+                url,
+                json=payload,
+                timeout=self.timeout,
+                headers={"Content-Type": "application/json"},
             )
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON response from Ollama: {e}")
+
+            if response.status_code == 200:
+                result = response.json()
+                # Ollama's native API returns response in "response" field
+                content = result.get("response", "").strip()
+                return content
+            else:
+                return None
+
+        except requests.exceptions.ConnectionError:
+            return None
+        except requests.exceptions.Timeout:
+            return None
+        except requests.exceptions.RequestException:
+            return None
+        except json.JSONDecodeError:
+            return None
 
     def is_available(self) -> bool:
         """
@@ -140,11 +146,13 @@ class OllamaClient:
         Returns:
             True if server is available, False otherwise
         """
+        if not self.available:
+            return False
+
         try:
-            # Try a simple health check (Ollama has a /api/tags endpoint)
-            req = urllib.request.Request(f"{self.base_url}/api/tags")
-            with urllib.request.urlopen(req, timeout=5):
-                return True
+            # Try a simple health check using Ollama's /api/tags endpoint
+            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            return response.status_code == 200
         except:
             return False
 
@@ -155,48 +163,33 @@ class OllamaClient:
         Returns:
             List of model names, or empty list if unavailable
         """
-        try:
-            req = urllib.request.Request(f"{self.base_url}/api/tags")
-            with urllib.request.urlopen(req, timeout=5) as response:
-                data = json.loads(response.read().decode("utf-8"))
-                return [model["name"] for model in data.get("models", [])]
-        except:
+        if not self.available:
             return []
 
-
-# Pentesting-focused system prompt
-PENTEST_SYSTEM_PROMPT = """You are a cybersecurity assistant that helps with AUTHORIZED penetration testing and defensive security analysis.
-
-CRITICAL RULES:
-- Only provide guidance for AUTHORIZED testing with explicit permission and scope
-- Always emphasize safety, non-destructive methods, and proper documentation
-- Refuse any request for unauthorized access, illegal activity, or harmful actions
-- Focus on defensive security, risk assessment, and remediation guidance
-
-Your expertise areas:
-- Service enumeration and configuration analysis
-- Vulnerability assessment and risk prioritization
-- Security hardening recommendations
-- Professional security reporting
-- Compliance frameworks (OWASP, NIST, etc.)
-
-Always ask for scope/authorization details if missing, and provide practical, actionable advice within authorized boundaries."""
+        try:
+            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                return [model["name"] for model in data.get("models", [])]
+        except:
+            pass
+        return []
 
 
-def create_pentest_client(model: str = "llama3.1:8b") -> OllamaClient:
-    """
-    Create a pre-configured Ollama client for pentesting use.
+def quick_test() -> bool:
+    """Quick test to see if Ollama is working with simple prompt."""
+    client = OllamaClient()
 
-    Args:
-        model: Default model to use (should be pulled in Ollama first)
+    if not client.is_available():
+        print("Ollama not available")
+        return False
 
-    Returns:
-        Configured OllamaClient instance
-    """
-    return OllamaClient()
+    response = client.chat("llama3.2:3b", "Hi", None, 0.1)
+    print(f"Test response: {response}")
+    return response is not None
 
 
-def quick_chat(message: str, model: str = "llama3.1:8b") -> str:
+def quick_chat(message: str, model: str = "llama3.2:3b") -> Optional[str]:
     """
     Quick helper for one-shot pentest questions.
 
@@ -205,16 +198,16 @@ def quick_chat(message: str, model: str = "llama3.1:8b") -> str:
         model: Model name to use
 
     Returns:
-        LLM response with pentesting context
+        LLM response with pentesting context, or None if failed
     """
     client = OllamaClient()
 
     if not client.is_available():
-        return "[Error] Ollama server not available. Please start Ollama and ensure the model is pulled."
+        return None
 
     return client.chat(
         model=model,
         message=message,
         system_prompt=PENTEST_SYSTEM_PROMPT,
-        temperature=0.3,  # Slightly creative but focused
+        temperature=0.3,
     )
