@@ -9,7 +9,7 @@ Usage:
 
     client = OllamaClient()
     if client.is_available():
-        response = client.chat("llama3.2:3b", "What are common SSH hardening steps?", PENTEST_SYSTEM_PROMPT)
+        response = client.chat("llama3.2:1b", "What are common SSH hardening steps?", PENTEST_SYSTEM_PROMPT)
         print(response)
 """
 
@@ -42,7 +42,7 @@ class OllamaClient:
     """Simple HTTP client for Ollama local LLM server using native API."""
 
     def __init__(
-        self, base_url: str = "http://localhost:11434", model: str = "llama3.2:3b"
+        self, base_url: str = "http://localhost:11434", model: str = "llama3.2:1b"
     ):
         """
         Initialize Ollama client.
@@ -67,7 +67,7 @@ class OllamaClient:
         Send a chat message to the local LLM using Ollama's native API.
 
         Args:
-            model: Model name (e.g., "llama3.2:3b")
+            model: Model name (e.g., "llama3.2:1b")
             message: User message to send
             system_prompt: Optional system prompt to set context
             temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative)
@@ -184,12 +184,12 @@ def quick_test() -> bool:
         print("Ollama not available")
         return False
 
-    response = client.chat("llama3.2:3b", "Hi", None, 0.1)
+    response = client.chat("llama3.2:1b", "Hi", None, 0.1)
     print(f"Test response: {response}")
     return response is not None
 
 
-def quick_chat(message: str, model: str = "llama3.2:3b") -> Optional[str]:
+def quick_chat(message: str, model: str = "llama3.2:1b") -> Optional[str]:
     """
     Quick helper for one-shot pentest questions.
 

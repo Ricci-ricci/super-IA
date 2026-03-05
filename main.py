@@ -18,7 +18,7 @@ except ImportError:
     # Fallback stub client
     class OllamaClient:
         def __init__(
-            self, base_url: str = "http://localhost:11434", model: str = "llama3.2:3b"
+            self, base_url: str = "http://localhost:11434", model: str = "llama3.2:1b"
         ):
             self.base_url = base_url
             self.model = model
