@@ -5,12 +5,7 @@ from parser import get_nmap_imput, parse_nmap
 
 
 def detect_intent(user_text: str) -> str:
-    """
-    Very small keyword-based intent detector.
 
-    It loops through INTENTS from knowledge_base and returns the first matching intent.
-    If nothing matches, returns "unknown".
-    """
     text = (user_text or "").strip().lower()
     if not text:
         return "unknown"
