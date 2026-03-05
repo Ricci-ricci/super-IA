@@ -86,3 +86,11 @@ SERVICES_ACTIONS = {
         "- If authorized, enumerate directory schema and exposed info carefully.\n"
     ),
 }
+
+
+INTENTS = {
+    "greeting": ["hello", "hi", "hey"],
+    "exit": ["exit", "quit", "bye"],
+    "scan": ["scan", "nmap", "analyze"],
+    "question": ["what", "how", "why"],
+}
