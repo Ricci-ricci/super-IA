@@ -1,22 +1,50 @@
-from action import detect_intents, get_input
-from knowledge_base import SERVICES_ACTIONS
-from parser import parse_nmap
+from __future__ import annotations
+
+from knowledge_base import INTENTS, SERVICES_ACTIONS
+from parser import get_nmap_imput, parse_nmap
+
+
+def detect_intent(user_text: str) -> str:
+    """
+    Very small keyword-based intent detector.
+
+    It loops through INTENTS from knowledge_base and returns the first matching intent.
+    If nothing matches, returns "unknown".
+    """
+    text = (user_text or "").strip().lower()
+    if not text:
+        return "unknown"
+
+    for intent, keywords in INTENTS.items():
+        for kw in keywords:
+            if kw in text:
+                return intent
+
+    return "unknown"
 
 
 def print_help() -> None:
     print(
-        "\nCommands:\n"
-        "- hello / hi / hey: greeting\n"
-        "- scan / nmap / analyze: enter scan mode (paste Nmap output)\n"
-        "- <service>: show recommendations for a service (e.g., ssh, http)\n"
-        "- exit / quit / bye: quit\n"
-        "\nTip: In scan mode, paste multi-line Nmap output then press Enter on an empty line.\n"
+        "\nCommands / intents:\n"
+        "- greeting: hello / hi / hey\n"
+        "- scan: scan / nmap / analyze  (then paste Nmap output)\n"
+        "- service: type a service name like ssh/http/https/smb/etc.\n"
+        "- exit: exit / quit / bye\n"
+        "\nHow to paste:\n"
+        "- After entering scan mode, paste multi-line Nmap output\n"
+        "- Press Enter on an empty line to finish\n"
     )
 
 
-def show_services(parsed) -> None:
+def show_scan_results(nmap_text: str) -> None:
+    parsed = parse_nmap(nmap_text)
+
     if not parsed:
-        print("No open services detected (or input wasn't an Nmap PORT table).")
+        print(
+            "I couldn't find any open services in that input.\n"
+            "Make sure you pasted Nmap normal output that includes the line:\n"
+            "  PORT  STATE  SERVICE  VERSION\n"
+        )
         return
 
     for port, service, version in parsed:
@@ -29,56 +57,68 @@ def show_services(parsed) -> None:
         print(f"Recommended Actions: {actions}")
 
 
-print("superPENTESTING - tiny assistant (portfolio). Type 'help' for commands.")
-
-while True:
-    user_text = input(">").strip()
-    if not user_text:
-        continue
-
-    intent = detect_intents(user_text)
-
-    if intent == "exit":
-        print("bye. Happy pentesting!")
-        break
-
-    if user_text.lower() in {"help", "?"}:
-        print_help()
-        continue
-
-    if intent == "greeting":
-        print(
-            "Hey! Tell me what you want to do: say 'scan' to paste an Nmap scan, or type a service like 'ssh'."
-        )
-        continue
-
-    if intent == "scan":
-        print(
-            "Paste your Nmap scan here — I’m gonna analyze it. (Empty line to finish)"
-        )
-        nmap_text = get_input()
-        if nmap_text.lower().strip() == "exit":
-            print("bye. Happy pentesting!")
-            break
-
-        parsed = parse_nmap(nmap_text)
-        show_services(parsed)
-        continue
-
-    # If the user typed a service name directly (e.g., "ssh", "http")
-    maybe_service = user_text.strip().lower()
-    if maybe_service in SERVICES_ACTIONS:
-        print(f"Exploring {maybe_service} service...")
-        print(SERVICES_ACTIONS[maybe_service])
-        continue
-
-    if intent == "question":
-        print(
-            "Ask me something concrete, or say 'scan' to paste Nmap output.\n"
-            "Example: 'scan' or 'ssh' or 'http'."
-        )
-        continue
-
+def main() -> None:
     print(
-        "I don't understand. Type 'help' for commands, or say 'scan' to paste Nmap output."
+        "superPENTESTING - tiny pentest helper (authorized use only). Type 'help' for commands.\n"
     )
+
+    while True:
+        try:
+            user_text = input(">").strip()
+        except EOFError:
+            print("\nbye. Happy pentesting!")
+            return
+
+        if not user_text:
+            continue
+
+        # Explicit help shortcut (kept simple on purpose)
+        if user_text.lower() in {"help", "?"}:
+            print_help()
+            continue
+
+        intent = detect_intent(user_text)
+
+        if intent == "greeting":
+            print(
+                "Hey! You can say 'scan' to paste an Nmap scan, or type a service like 'ssh'/'http'."
+            )
+            continue
+
+        if intent == "exit":
+            print("bye. Happy pentesting!")
+            return
+
+        if intent == "scan":
+            print(
+                "Paste your Nmap scan here — I'm gonna analyze it. (Empty line to finish)\n"
+            )
+            nmap_text = get_nmap_imput()
+            if nmap_text.strip().lower() in {"exit", "quit", "bye"}:
+                print("bye. Happy pentesting!")
+                return
+            show_scan_results(nmap_text)
+            continue
+
+        if intent == "question":
+            print(
+                "Tell me what you want to do.\n"
+                "- Say 'scan' to paste an Nmap scan\n"
+                "- Or type a service name like 'ssh' or 'http'\n"
+            )
+            continue
+
+        # Fallback: treat the input as a service name if it matches knowledge base
+        maybe_service = user_text.strip().lower()
+        if maybe_service in SERVICES_ACTIONS:
+            print(f"Exploring {maybe_service} service...\n")
+            print(SERVICES_ACTIONS[maybe_service])
+            continue
+
+        print(
+            "I don't understand. Type 'help', say 'scan', or type a known service (e.g., ssh/http)."
+        )
+
+
+if __name__ == "__main__":
+    main()

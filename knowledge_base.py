@@ -1,3 +1,10 @@
+INTENTS = {
+    "greeting": ["hello", "hi", "hey", "yo", "sup"],
+    "exit": ["exit", "quit", "bye", "goodbye", "q"],
+    "scan": ["scan", "nmap", "analyze", "analysis"],
+    "question": ["what", "how", "why", "help", "explain", "?"],
+}
+
 SERVICES_ACTIONS = {
     "ssh": (
         "SSH service detected.\n"
@@ -85,12 +92,4 @@ SERVICES_ACTIONS = {
         "- Determine if LDAPS is available/required.\n"
         "- If authorized, enumerate directory schema and exposed info carefully.\n"
     ),
-}
-
-
-INTENTS = {
-    "greeting": ["hello", "hi", "hey"],
-    "exit": ["exit", "quit", "bye"],
-    "scan": ["scan", "nmap", "analyze"],
-    "question": ["what", "how", "why"],
 }

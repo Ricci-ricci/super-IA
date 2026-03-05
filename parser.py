@@ -54,7 +54,7 @@ def get_nmap_imput():
     lines = []
     while True:
         try:
-            line = input(">").rstrip("\n")
+            line = input()
         except EOFError:
             # stdin closed; treat as end of paste (allows piping too)
             break
