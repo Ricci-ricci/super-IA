@@ -1,8 +1,11 @@
 INTENTS = {
+    # NOTE: intent detection should match whole words in the user's text.
+    # Keep these as single words (no spaces/punctuation) so the matcher can tokenize safely.
     "greeting": ["hello", "hi", "hey", "yo", "sup"],
     "exit": ["exit", "quit", "bye", "goodbye", "q"],
     "scan": ["scan", "nmap", "analyze", "analysis"],
-    "question": ["what", "how", "why", "help", "explain", "?"],
+    # Include "question" itself so phrases like "I have a question" match.
+    "question": ["question", "what", "how", "why", "help", "explain"],
 }
 
 SERVICES_ACTIONS = {

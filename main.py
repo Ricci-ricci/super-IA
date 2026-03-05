@@ -1,18 +1,30 @@
 from __future__ import annotations
 
+import re
+
 from knowledge_base import INTENTS, SERVICES_ACTIONS
 from parser import get_nmap_imput, parse_nmap
 
 
 def detect_intent(user_text: str) -> str:
+    """
+    Very small keyword-based intent detector.
 
+    IMPORTANT:
+    - Uses token/word matching (not substring matching) to avoid cases like:
+      "question" containing "q" and falsely triggering "exit".
+    """
     text = (user_text or "").strip().lower()
     if not text:
         return "unknown"
 
+    # Tokenize into words (letters/numbers/underscore). This ignores punctuation.
+    tokens = set(re.findall(r"\b\w+\b", text))
+
     for intent, keywords in INTENTS.items():
         for kw in keywords:
-            if kw in text:
+            # match whole tokens only
+            if kw in tokens:
                 return intent
 
     return "unknown"
