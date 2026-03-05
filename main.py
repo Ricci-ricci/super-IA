@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
 import re
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from knowledge_base import INTENTS, SERVICES_ACTIONS
 from parser import get_nmap_imput, parse_nmap
@@ -15,27 +14,21 @@ try:
 except ImportError:
     HAS_LLM = False
 
-    # Fallback stub client
-    class OllamaClient:
-        def __init__(
-            self, base_url: str = "http://localhost:11434", model: str = "llama3.2:1b"
-        ):
+    # Create a simple fallback that doesn't conflict with types
+    class _StubClient:
+        def __init__(self, base_url="http://localhost:11434", model="llama3.2:1b"):
             self.base_url = base_url
             self.model = model
             self.available = False
+            self.timeout = 20
 
-        def chat(
-            self,
-            model: str,
-            message: str,
-            system_prompt: str = None,
-            temperature: float = 0.3,
-        ) -> str:
+        def chat(self, model, message, system_prompt=None, temperature=0.3):
             return None
 
-        def is_available(self) -> bool:
+        def is_available(self):
             return False
 
+    OllamaClient = _StubClient
     PENTEST_SYSTEM_PROMPT = ""
 
 
@@ -104,9 +97,7 @@ def build_pentesting_context(parsed_services: list) -> str:
     return "\n".join(context_parts)
 
 
-def get_llm_scan_analysis(
-    parsed_services: list, llm_client: OllamaClient
-) -> Optional[str]:
+def get_llm_scan_analysis(parsed_services: list, llm_client) -> Optional[str]:
     """Get AI analysis of scan results using local LLM with quick timeout."""
     if not llm_client.is_available():
         return None
@@ -124,14 +115,14 @@ def get_llm_scan_analysis(
         return llm_client.chat(
             model=llm_client.model,
             message=simple_prompt,
-            system_prompt=None,  # No system prompt for speed
+            system_prompt="",  # Empty string instead of None
             temperature=0.0,
         )
     except Exception:
         return None
 
 
-def show_scan_results(nmap_text: str, llm_client: OllamaClient) -> None:
+def show_scan_results(nmap_text: str, llm_client) -> None:
     parsed = parse_nmap(nmap_text)
 
     if not parsed:

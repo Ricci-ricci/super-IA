@@ -15,16 +15,19 @@ Usage:
 
 from __future__ import annotations
 
-import json
 from typing import Optional
 
 # Try to import requests, fall back gracefully if not available
 try:
+    import json
+
     import requests
 
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
+    requests = None
+    json = None
 
 
 # Pentesting-focused system prompt - simplified for faster inference
@@ -114,6 +117,9 @@ class OllamaClient:
         """
         url = f"{self.base_url}{endpoint}"
 
+        if not HAS_REQUESTS or requests is None:
+            return None
+
         try:
             response = requests.post(
                 url,
@@ -130,13 +136,7 @@ class OllamaClient:
             else:
                 return None
 
-        except requests.exceptions.ConnectionError:
-            return None
-        except requests.exceptions.Timeout:
-            return None
-        except requests.exceptions.RequestException:
-            return None
-        except json.JSONDecodeError:
+        except Exception:
             return None
 
     def is_available(self) -> bool:
@@ -150,10 +150,12 @@ class OllamaClient:
             return False
 
         try:
+            if not HAS_REQUESTS or requests is None:
+                return False
             # Try a simple health check using Ollama's /api/tags endpoint
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             return response.status_code == 200
-        except:
+        except Exception:
             return False
 
     def list_models(self) -> list[str]:
@@ -167,11 +169,13 @@ class OllamaClient:
             return []
 
         try:
+            if not HAS_REQUESTS or requests is None:
+                return []
             response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 return [model["name"] for model in data.get("models", [])]
-        except:
+        except Exception:
             pass
         return []
 
