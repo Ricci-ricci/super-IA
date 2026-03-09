@@ -169,7 +169,7 @@ def main() -> None:
     # Initialize LLM client
     llm_client = OllamaClient()
 
-    print("superPENTESTING - tiny pentest helper (authorized use only).")
+    print("super-AI - tiny pentest helper (authorized use only).")
     if HAS_LLM and llm_client.is_available():
         print(f"AI analysis enabled (model: {llm_client.model})")
     else:
