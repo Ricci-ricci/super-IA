@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import io
-from contextlib import redirect_stdout
 from typing import Optional
 
 import gradio as gr
